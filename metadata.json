@@ -1,0 +1,6 @@
+{
+  "name": "Simulator Windows 11 - Exercitiu 1",
+  "description": "An interactive web application that simulates the Windows 11 desktop and File Explorer. Users are guided through a scenario to find a specific file using advanced search filters, mimicking the real operating system's UI and functionality.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
