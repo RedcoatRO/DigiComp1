@@ -14,7 +14,7 @@ import { useActionLogger } from './hooks/useActionLogger';
 import { getInitialFileSystem } from './constants';
 import { AppWindowState, AppType, FileSystemNode, ActionType, EvaluationResult } from './types';
 import * as fs from './utils/fileSystem';
-import { calculateScore, calculateLiveScore } from './utils/evaluation';
+import { calculateScore } from './utils/evaluation';
 
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
@@ -30,8 +30,10 @@ const App: React.FC = () => {
   const [hint, setHint] = useState<string | null>(null);
   const [wasHintShown, setWasHintShown] = useState(false);
   const hintTimeoutRef = useRef<number | null>(null);
-  // Stare nouă pentru scorul live. Inițializat cu 10.
-  const [currentScore, setCurrentScore] = useState(10);
+  // Stare pentru scorul live (0-100).
+  const [currentScore, setCurrentScore] = useState(0);
+  // Stare pentru feedback-ul detaliat, sincronizat cu scorul.
+  const [evaluationDetails, setEvaluationDetails] = useState<string[]>([]);
 
 
   // --- THEME LOGIC ---
@@ -48,13 +50,14 @@ const App: React.FC = () => {
   // --- SCORE & HINT SYSTEM LOGIC ---
 
   /**
-   * Acest effect se declanșează la fiecare acțiune a utilizatorului.
-   * Calculează scorul live și verifică dacă trebuie afișat un indiciu.
+   * Acest efect se declanșează la fiecare acțiune a utilizatorului.
+   * Calculează scorul live și detaliile asociate, și gestionează afișarea indiciilor.
    */
   useEffect(() => {
-    // 1. Calculează și actualizează scorul live afișat în Taskbar.
-    const liveScore = calculateLiveScore(actions);
+    // 1. Calculează și actualizează scorul și detaliile live folosind funcția unificată.
+    const { score: liveScore, details: liveDetails } = calculateScore(actions);
     setCurrentScore(liveScore);
+    setEvaluationDetails(liveDetails); // Stocăm detaliile pentru a le folosi în modalul final.
 
     // 2. Logica pentru afișarea indiciilor (nemodificată).
     if (wasHintShown || evaluationResult) return;
@@ -87,9 +90,21 @@ const App: React.FC = () => {
   }, [actions, wasHintShown, evaluationResult]);
 
   // --- EVALUATION LOGIC ---
+  /**
+   * Finalizează evaluarea.
+   * Preia scorul și detaliile calculate după ultima acțiune și afișează modalul de evaluare.
+   */
   const handleEvaluate = () => {
-    const result = calculateScore(actions);
-    setEvaluationResult(result);
+    // Generează mesajul final de feedback pe baza detaliilor deja calculate.
+    const finalFeedback = evaluationDetails.some(d => d.includes('ai găsit și deschis'))
+        ? 'Felicitări! Ai finalizat exercițiul. Iată o analiză detaliată a performanței tale:'
+        : 'Exercițiul s-a încheiat. Data viitoare, încearcă să folosești mai eficient uneltele de căutare.';
+
+    setEvaluationResult({
+        score: currentScore, // Folosim scorul curent, calculat live.
+        feedback: finalFeedback,
+        details: evaluationDetails, // Folosim detaliile curente.
+    });
     setHint(null);
     if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
   };
