@@ -15,6 +15,7 @@ import { getInitialFileSystem } from './constants';
 import { AppWindowState, AppType, FileSystemNode, ActionType, EvaluationResult } from './types';
 import * as fs from './utils/fileSystem';
 import { calculateScore } from './utils/evaluation';
+import { sendEvaluationResult } from './utils/communication'; // Importăm noua funcție
 
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
@@ -91,8 +92,7 @@ const App: React.FC = () => {
 
   // --- EVALUATION LOGIC ---
   /**
-   * Finalizează evaluarea.
-   * Preia scorul și detaliile calculate după ultima acțiune și afișează modalul de evaluare.
+   * Finalizează evaluarea, afișează modalul și trimite rezultatul prin postMessage.
    */
   const handleEvaluate = () => {
     // Generează mesajul final de feedback pe baza detaliilor deja calculate.
@@ -107,6 +107,24 @@ const App: React.FC = () => {
     });
     setHint(null);
     if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+
+    // --- NOU: Trimiterea rezultatului prin postMessage ---
+    // Pregătim datele pentru a fi trimise către platforma gazdă.
+    // Numărăm sarcinile corecte pe baza prefixului '✓' din detaliile de evaluare.
+    const tasksCompleted = evaluationDetails.filter(d => d.startsWith('✓')).length;
+    const totalTasks = evaluationDetails.length;
+    
+    // Creăm un string cu detaliile, eliminând prefixele pentru a fi mai curat.
+    const detailsString = evaluationDetails.map(d => d.substring(2)).join(' | ');
+
+    // Apelăm funcția de comunicare pentru a trimite datele.
+    sendEvaluationResult(
+      currentScore,
+      100, // Scorul maxim este 100
+      detailsString,
+      tasksCompleted,
+      totalTasks
+    );
   };
 
 
