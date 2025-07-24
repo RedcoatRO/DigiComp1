@@ -14,7 +14,7 @@ import { useActionLogger } from './hooks/useActionLogger';
 import { getInitialFileSystem } from './constants';
 import { AppWindowState, AppType, FileSystemNode, ActionType, EvaluationResult } from './types';
 import * as fs from './utils/fileSystem';
-import { calculateScore } from './utils/evaluation';
+import { calculateScore, calculateLiveScore } from './utils/evaluation';
 
 const App: React.FC = () => {
   // --- STATE MANAGEMENT ---
@@ -30,6 +30,8 @@ const App: React.FC = () => {
   const [hint, setHint] = useState<string | null>(null);
   const [wasHintShown, setWasHintShown] = useState(false);
   const hintTimeoutRef = useRef<number | null>(null);
+  // Stare nouă pentru scorul live. Inițializat cu 10.
+  const [currentScore, setCurrentScore] = useState(10);
 
 
   // --- THEME LOGIC ---
@@ -43,24 +45,28 @@ const App: React.FC = () => {
     setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
   }, [setTheme]);
 
-  // --- HINT SYSTEM LOGIC ---
+  // --- SCORE & HINT SYSTEM LOGIC ---
+
   /**
-   * Acest effect monitorizează acțiunile utilizatorului pentru a oferi un indiciu
-   * dacă pare blocat. Un indiciu este afișat o singură dată pe sesiune.
+   * Acest effect se declanșează la fiecare acțiune a utilizatorului.
+   * Calculează scorul live și verifică dacă trebuie afișat un indiciu.
    */
   useEffect(() => {
-    if (wasHintShown || evaluationResult) return; // Nu arăta indicii dacă a fost deja arătat sau dacă evaluarea e vizibilă
+    // 1. Calculează și actualizează scorul live afișat în Taskbar.
+    const liveScore = calculateLiveScore(actions);
+    setCurrentScore(liveScore);
+
+    // 2. Logica pentru afișarea indiciilor (nemodificată).
+    if (wasHintShown || evaluationResult) return;
 
     const showHint = (message: string) => {
         setHint(message);
-        setWasHintShown(true); // Marchează că indiciul a fost arătat
+        setWasHintShown(true);
         if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
-        // Ascunde automat indiciul după 15 secunde
         hintTimeoutRef.current = window.setTimeout(() => setHint(null), 15000);
     };
 
     const navigationActions = actions.filter(a => a.type === ActionType.NAVIGATE);
-    // Condiția 1: Prea multe navigări fără a ajunge la folderul corect
     if (navigationActions.length >= 5) {
         const hasReachedTargetFolder = navigationActions.some(a => a.payload.path.includes('Resurse 2023'));
         if (!hasReachedTargetFolder) {
@@ -69,11 +75,10 @@ const App: React.FC = () => {
         }
     }
     
-    // Condiția 2: Căutări multiple fără succes
     const searchActions = actions.filter(a => a.type === ActionType.SEARCH);
     if (searchActions.length >= 3) {
         const lastSearch = searchActions[searchActions.length - 1].payload;
-        if (!lastSearch.filters.type) { // Verifică dacă nu a folosit filtrul de tip
+        if (!lastSearch.filters.type) {
             showHint("Indiciu: Încearcă să folosești filtrele avansate pentru a rafina căutarea după tipul fișierului.");
             return;
         }
@@ -85,8 +90,7 @@ const App: React.FC = () => {
   const handleEvaluate = () => {
     const result = calculateScore(actions);
     setEvaluationResult(result);
-    resetActions();
-    setHint(null); // Ascunde orice indiciu activ la evaluare
+    setHint(null);
     if(hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
   };
 
@@ -234,6 +238,7 @@ const App: React.FC = () => {
         openWindows={openWindows}
         onWindowClick={bringToFront}
         onToggleMinimize={toggleMinimize}
+        currentScore={currentScore} // Pasăm scorul live către Taskbar
       />
       
       {openWindows.map(windowState => (
@@ -254,7 +259,9 @@ const App: React.FC = () => {
           score={evaluationResult.score}
           feedback={evaluationResult.feedback}
           details={evaluationResult.details}
-          onClose={() => setEvaluationResult(null)}
+          // Prop-ul onClose a fost eliminat pentru a preveni închiderea ferestrei de evaluare.
+          // Acest lucru asigură că rezultatul rămâne vizibil pentru citirea de către platforme externe.
+          // Logica de resetare a aplicației, care era în onClose, nu se va mai executa.
         />
       )}
 

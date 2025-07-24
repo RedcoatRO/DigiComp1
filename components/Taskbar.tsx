@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StartIcon, SearchIcon, FileExplorerIcon, WifiIcon, SoundIcon, SunIcon, MoonIcon, NotepadIcon, CalculatorIcon, EvaluationIcon } from './Icons';
+import ScoreDisplay from './ScoreDisplay'; // Importăm noul component
 import { AppWindowState, AppType } from '../types';
 
 interface TaskbarProps {
@@ -11,6 +12,7 @@ interface TaskbarProps {
   openWindows: AppWindowState[];
   onWindowClick: (id: string) => void;
   onToggleMinimize: (id: string) => void;
+  currentScore: number; // Prop nou pentru scorul live
 }
 
 const getAppIcon = (appType: AppType, className: string = "w-6 h-6") => {
@@ -27,10 +29,9 @@ const getAppIcon = (appType: AppType, className: string = "w-6 h-6") => {
 }
 
 const Taskbar: React.FC<TaskbarProps> = (props) => {
-  const { onToggleStart, onToggleSearch, onToggleTheme, onEvaluate, theme, openWindows, onWindowClick, onToggleMinimize } = props;
+  const { onToggleStart, onToggleSearch, onToggleTheme, onEvaluate, theme, openWindows, onWindowClick, onToggleMinimize, currentScore } = props;
   const [time, setTime] = useState(new Date());
   
-  // Găsește fereastra activă (cea cu z-index-ul cel mai mare)
   const activeWindowId = openWindows.length > 0 ? openWindows.reduce((max, w) => w.zIndex > max.zIndex ? w : max).id : null;
 
   useEffect(() => {
@@ -53,7 +54,9 @@ const Taskbar: React.FC<TaskbarProps> = (props) => {
           <SearchIcon className="w-6 h-6 text-gray-800 dark:text-gray-200" />
         </button>
         
-        {/* Buton de evaluare modificat */}
+        {/* Adăugăm componenta de scor lângă butonul de evaluare */}
+        <ScoreDisplay score={currentScore} />
+        
         <button
           className="px-3 py-1.5 flex items-center gap-2 rounded-md bg-green-500/80 hover:bg-green-600/80 text-white font-semibold text-sm active:scale-95 transition-all"
           onClick={onEvaluate}

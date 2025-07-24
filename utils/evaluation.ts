@@ -4,6 +4,59 @@ import { ActionLogEntry, ActionType, FileType, EvaluationResult } from '../types
 const TARGET_FILE_ID = 'file-1'; // ID-ul fișierului pe care utilizatorul trebuie să-l găsească.
 const IDEAL_FOLDER_PATH = ['This PC', 'Documents', 'Resurse 2023']; // Calea ideală către folderul care conține fișierul.
 
+
+/**
+ * Calculează scorul LIVE al utilizatorului pe măsură ce acesta interacționează cu aplicația.
+ * Această funcție este optimizată pentru a oferi feedback în timp real, spre deosebire de `calculateScore` care face evaluarea finală.
+ * @param actions - Lista curentă de acțiuni ale utilizatorului.
+ * @returns Un număr reprezentând scorul curent, între 1 și 10.
+ */
+export const calculateLiveScore = (actions: ActionLogEntry[]): number => {
+  // Scorul de bază de la care se scade/adună
+  let score = 10;
+  
+  // 1. Analiza eficienței navigației
+  const navigationActions = actions.filter(a => a.type === ActionType.NAVIGATE);
+  const irrelevantNavigations = navigationActions.filter(a => {
+    const path = a.payload.path as string[];
+    // Penalizează pentru navigare în foldere care nu sunt pe calea corectă
+    return !IDEAL_FOLDER_PATH.join('/').startsWith(path.join('/')) && !path.join('/').startsWith(IDEAL_FOLDER_PATH.join('/'))
+  }).length;
+  
+  if (irrelevantNavigations > 0) {
+    score -= irrelevantNavigations * 1;
+  } else if (navigationActions.length > 3) {
+    // Penalizează pentru click-uri în plus, chiar și pe calea corectă
+    score -= (navigationActions.length - 3) * 0.25;
+  }
+
+  // 2. Analiza utilizării căutării și filtrelor
+  const searchActions = actions.filter(a => a.type === ActionType.SEARCH);
+  
+  // Penalizează pentru neutilizarea căutării doar dacă utilizatorul pare blocat (multe navigări fără rezultat)
+  if (searchActions.length === 0 && navigationActions.length > 4) {
+    score -= 3;
+  }
+  
+  if (searchActions.length > 0) {
+    // Evaluează cea mai recentă acțiune de căutare
+    const lastSearch = searchActions[searchActions.length - 1].payload;
+    
+    // Verifică filtrele aplicate
+    if (lastSearch.filters.type === FileType.PDF) score += 1.5; else score -= 1;
+    if (lastSearch.filters.size?.comparison === 'gt' && lastSearch.filters.size?.value >= 1024) score += 1; else score -= 0.5;
+    
+    // Verifică termenii de căutare
+    if (lastSearch.query.toLowerCase().includes('manual')) {
+      score += 1;
+    }
+  }
+  
+  // Asigură că scorul rămâne în intervalul 1-10
+  return Math.max(1, Math.min(10, Math.round(score)));
+};
+
+
 /**
  * Calculează scorul utilizatorului pe baza unei liste de acțiuni înregistrate.
  * @param actions - Un array de obiecte `ActionLogEntry` care reprezintă istoricul acțiunilor.
